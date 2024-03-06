@@ -4,6 +4,7 @@ import os
 import numpy as np
 import math
 
+
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
 
@@ -14,19 +15,21 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-
+    
 # Load the data
-data_path = "GL_small_ensemble.parquet.gzip"
-data = pd.read_parquet(data_path)
+data_path = "GL_ensemble.parquet.gzip"
+image_df = pd.read_parquet(data_path)
+image_names = [f'sim_{i}' for i in range(1,4041)]
 
-# extract data, skipping first two columns.
-sim_data = data.iloc[:, 2:].to_numpy() 
+realizations_resized = np.zeros((4020, 96, 96))
 
-# reshape data into 100x100x100 grid
-realizations = sim_data.reshape(100, 100, 100) 
+for i in range(4020):
+    realization_og = np.array(image_df[image_names[i]].values).reshape(100,100)
+    tmp = realization_og[:96, :96]
+    realizations_resized[i] = tmp
 
 # Normalize the data to the range [-1, 1]
-realizations_normalized = (realizations - realizations.min()) / (realizations.max() - realizations.min()) * 2 - 1
+realizations_normalized = (realizations_resized - realizations_resized.min()) / (realizations_resized.max() - realizations_resized.min()) * 2 - 1
 
 
 os.makedirs("images", exist_ok=True)
@@ -39,7 +42,7 @@ parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first 
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=100, help="size of each image dimension")
+parser.add_argument("--img_size", type=int, default=96, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval between image sampling")
 opt = parser.parse_args()
@@ -102,7 +105,10 @@ class Discriminator(nn.Module):
             *discriminator_block(64, 128),
         )
 
-        self.adv_layer = nn.Sequential(nn.Linear(6272, 1), nn.Sigmoid())
+        ds_size = opt.img_size // 2 ** 4
+        self.adv_layer = nn.Sequential(nn.Linear(128 * ds_size ** 2, 1), nn.Sigmoid())
+        # self.adv_layer = nn.Sequential(nn.Linear(6272, 1), nn.Sigmoid())
+
 
 
 

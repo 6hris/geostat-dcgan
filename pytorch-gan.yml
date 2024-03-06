@@ -1,0 +1,22 @@
+name: pytorch-gan
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - pytorch
+  - torchvision
+  - cudatoolkit=10.2
+  - fastparquet
+  - pyarrow
+  - pip:
+      - torch==2.2.0
+      - torchvision==0.17.0
+
