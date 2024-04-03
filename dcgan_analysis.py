@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from dcgan import Generator
 import torch
+import skgstat as skg
 
 def main():
     checkpoint = 10
@@ -13,7 +14,7 @@ def main():
 
     sgs_df = pd.read_parquet("GL_ensemble.parquet.gzip", engine = "fastparquet")
     dcgan_df = dcgan_sim(checkpoint_path, 25)
-
+   
     print("Begin")
 
     coords = sgs_df[['X','Y']].values.reshape(100,100,2)
@@ -45,6 +46,10 @@ def main():
     # Difference map of Variance
     plot_colormap(coords[:,0], coords[:,1],SGS_var - dcgan_var, "Difference Norm Mean Ele", 
                     f"SGS - DCGAN Elevation CP {checkpoint}", checkpoint, "diff_mean.png")
+    
+    plot_variograms(coords, sgs_topo, dcgan_df, checkpoint)
+
+    print("done")
 
 
 def dcgan_sim(checkpoint_path, num_images):
@@ -95,6 +100,43 @@ def plot_colormap(X, Y, Color, colorbar_title, title, cp, filename):
     os.makedirs(save_dir, exist_ok=True)
     
     fig.savefig(os.path.join(save_dir, filename), dpi=fig.dpi)
+
+def plot_variograms(coords, sgs, dcgan, cp):
+
+    maxlag = 50000      # maximum range distance
+    n_lags = 70         # num of bins
+
+    save_dir = f'compare/cp_{cp}'
+    os.makedirs(save_dir, exist_ok=True)
+
+    for i in range(8):
+
+        print("Starting variogram calculation")
+        V1 = skg.Variogram(coords, sgs[i], bin_func='even', n_lags=n_lags, maxlag=maxlag, normalize=False)
+        print(f"Finished w/ Variogram {i*4+1}\n")
+        V2 = skg.Variogram(coords, dcgan[i*3], bin_func='even', n_lags=n_lags, maxlag=maxlag, normalize=False)
+        print(f"Finished w/ Variogram {i*4+2}\n")
+        V3 = skg.Variogram(coords, dcgan[i*3+1], bin_func='even', n_lags=n_lags, maxlag=maxlag, normalize=False)
+        print(f"Finished w/ Variogram {i*4+3}\n")
+        V4 = skg.Variogram(coords, dcgan[i*3+2], bin_func='even', n_lags=n_lags, maxlag=maxlag, normalize=False)
+        print(f"Finished w/ Variogram {i*4+4}\n")
+
+
+        xdata = V1.bins
+        V1data = V1.experimental
+        V2data = V2.experimental
+        V3data = V3.experimental
+        V4data = V4.experimental
+
+        fig = plt.figure(figsize=(6,4))
+        plt.scatter(xdata, V1data, s=12, c='k', marker='*', label='SGS Sim')
+        plt.scatter(xdata, V2data, s=12, c='r', label=f'DCGAN Sim {i*3+1}')
+        plt.scatter(xdata, V3data, s=12, c='g', label=f'DCGAN Sim {i*3+2}')
+        plt.scatter(xdata, V4data, s=12, c='b', label=f'DCGAN Sim {i*3+3}')
+        plt.legend(loc="upper left")
+        plt.title(f'Isotropic Experimental Variogram CP {cp}')
+        plt.xlabel('Lag (m)'); plt.ylabel('Semivariance')
+        fig.savefig(os.path.join(save_dir, f'vario_sgs_DCGAN{i*3+1}-{i*3+3}.png'), dpi=fig.dpi)
 
 if __name__ == "__main__":
     main()
